@@ -6,9 +6,11 @@ use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\RequestOptions;
 use Przelewy24\Api\Api;
 use Przelewy24\Api\Requests\Items\CartItem;
+use Przelewy24\Api\Requests\Items\RefundItem;
 use Przelewy24\Api\Requests\Items\Shipping;
 use Przelewy24\Api\Responses\Transaction\FindTransactionResponse;
 use Przelewy24\Api\Responses\Transaction\RegisterTransactionResponse;
+use Przelewy24\Api\Responses\Transaction\TransactionRefundResponse;
 use Przelewy24\Api\Responses\Transaction\VerifyTransactionResponse;
 use Przelewy24\Enums\Country;
 use Przelewy24\Enums\Currency;
@@ -47,6 +49,7 @@ class TransactionRequests extends Api
         ?string $methodRefId = null,
         ?array $cart = null,
         ?Shipping $shippingData = null,
+        ?string $urlCardPaymentNotification = null,
     ): RegisterTransactionResponse {
         $sign = Przelewy24::createSignature([
             'sessionId' => $sessionId,
@@ -85,6 +88,7 @@ class TransactionRequests extends Api
             'sign' => $sign,
             'encoding' => $encoding->value,
             'methodRefId' => $methodRefId,
+            'urlCardPaymentNotification' => $urlCardPaymentNotification,
         ];
 
         if ($cart) {
@@ -145,6 +149,28 @@ class TransactionRequests extends Api
             $response = $this->client()->get("api/v1/transaction/by/sessionId/{$sessionId}");
 
             return FindTransactionResponse::fromResponse($response);
+        } catch (BadResponseException $exception) {
+            throw Przelewy24Exception::fromBadResponseException($exception);
+        }
+    }
+
+    public function refund(
+        string $requestId,
+        array $refunds,
+        string $refundsUuid,
+        ?string $urlStatus = null,
+    ): TransactionRefundResponse {
+        try {
+            $response = $this->client()->post('api/v1/transaction/refund', [
+                RequestOptions::JSON => [
+                    'requestId' => $requestId,
+                    'refunds' => array_map(fn (RefundItem $refundItem) => $refundItem->toArray(), $refunds),
+                    'refundsUuid' => $refundsUuid,
+                    'urlStatus' => $urlStatus,
+                ],
+            ]);
+
+            return TransactionRefundResponse::fromResponse($response);
         } catch (BadResponseException $exception) {
             throw Przelewy24Exception::fromBadResponseException($exception);
         }
